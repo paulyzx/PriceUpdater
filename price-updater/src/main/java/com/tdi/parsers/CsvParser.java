@@ -1,4 +1,4 @@
-package com.tdi.utils;
+package com.tdi.parsers;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -10,8 +10,6 @@ public class CsvParser {
     private List<String[]> data;
     private String filePath;
     final String DELIMITER = ",";
-    final String TARGET = "-";
-    final String REPLACEMENT = "";
     final String END_OF_LINE = "\n";
 
     public CsvParser(String filePath) {
@@ -44,7 +42,7 @@ public class CsvParser {
         List<String> values = new ArrayList<>();
         for (char c : line.toCharArray()) {
             if (c == ',' && quoteCount % 2 == 0) {
-                values.add(value.replace(TARGET, REPLACEMENT));
+                values.add(value);
                 value = "";
             } else if (c == '"') {
                 quoteCount++;

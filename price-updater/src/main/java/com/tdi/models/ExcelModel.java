@@ -2,29 +2,22 @@ package com.tdi.models;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import com.tdi.utils.ExcelParser;
+import com.tdi.models.config.VendorColumn;
+import com.tdi.parsers.ExcelParser;
 
 public class ExcelModel {
     private List<ImportModel> table = new ArrayList<ImportModel>();
 
-    public ExcelModel(String filePath, String columnList) {
+    public ExcelModel(String filePath, VendorColumn vendorColumn) {
         table.clear();
-        List<Integer> columns = Stream.of(columnList.split(","))
-                .map(Integer::parseInt)
-                .collect(Collectors.toList());
-        int rowsToSkip = columns.get(columns.size() - 1);
-        columns.remove(columns.size() - 1);
-
-        ExcelParser parser = new ExcelParser(filePath, columns, rowsToSkip);
+        ExcelParser parser = new ExcelParser(filePath, vendorColumn);
         try {
             parser.Parse();
         } catch (Exception e) {
-            System.out.println("Error parsing Excel file: " + e.getMessage());
+            System.out.println("Warning while parsing Excel file: " + e.getMessage());
         }
-        parser.getTable().forEach(row -> {
+        parser.getParsedDataTable().forEach(row -> {
             if (row.size() == 4) {
                 try {
                     table.add(new ImportModel(row.get(0).toString(), row.get(1).toString(), "", (Double) row.get(2),

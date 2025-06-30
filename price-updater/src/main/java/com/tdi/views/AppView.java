@@ -80,11 +80,19 @@ public class AppView {
 
         JScrollPane scrollPaneBottom = new JScrollPane(textAreaLog);
         scrollPaneBottom.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        bottomPanel.add(scrollPaneBottom);
+
+        // Replace the bottomPanel + SOUTH add with a split pane:
+        JSplitPane verticalSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, centerPanel, scrollPaneBottom);
+        verticalSplit.setResizeWeight(0.80); // top gets ~80% initially
+        verticalSplit.setOneTouchExpandable(true); // adds quick expand/collapse buttons
+        verticalSplit.setContinuousLayout(true); // smoother dragging
+        verticalSplit.setBorder(null); // optional: cleaner look
 
         frame.add(panel, BorderLayout.NORTH);
-        frame.add(centerPanel, BorderLayout.CENTER);
-        frame.add(bottomPanel, BorderLayout.SOUTH);
+        frame.add(verticalSplit, BorderLayout.CENTER);
+
+        // If you want an initial divider position after the frame shows:
+        SwingUtilities.invokeLater(() -> verticalSplit.setDividerLocation(0.75));
 
         frame.setVisible(true);
         redirectSystemStreams();
@@ -107,15 +115,31 @@ public class AppView {
     }
 
     public void displayData(String data) {
-        textAreaQb.setText(data);
+        SwingUtilities.invokeLater(() -> {
+            textAreaQb.setText(data);
+            textAreaQb.setCaretPosition(0);
+            textAreaQb.revalidate();
+            textAreaQb.repaint();
+        });
     }
 
     public void displayImportData(String data) {
-        textAreaImport.setText(data);
+        SwingUtilities.invokeLater(() -> {
+            textAreaImport.setText(data);
+            textAreaImport.setCaretPosition(0);
+            textAreaImport.revalidate();
+            textAreaImport.repaint();
+        });
     }
 
     public void displayExportData(String data) {
         textAreaExport.setText(data);
+        SwingUtilities.invokeLater(() -> {
+            textAreaExport.setText(data);
+            textAreaExport.setCaretPosition(0);
+            textAreaExport.revalidate();
+            textAreaExport.repaint();
+        });
     }
 
     private void redirectSystemStreams() {

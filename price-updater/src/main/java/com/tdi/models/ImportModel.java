@@ -6,9 +6,14 @@ public class ImportModel {
     private String type;
     private double listPrice;
     private double cost;
+    private String searchPartNumber;
+
+    private static final String TARGET = "-";
+    private static final String REPLACEMENT = "";
 
     public ImportModel(String partNumber, String description, String Type, double listPrice, double cost) {
         this.partNumber = partNumber;
+        this.searchPartNumber = partNumber != null ? partNumber.replace(TARGET, REPLACEMENT) : "";
         this.description = description;
         this.listPrice = listPrice;
         this.cost = cost;
@@ -21,6 +26,10 @@ public class ImportModel {
 
     public String getPartNumber() {
         return partNumber;
+    }
+
+    public String getSearchablePartNumber() {
+        return searchPartNumber;
     }
 
     public double getCost() {

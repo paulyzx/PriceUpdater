@@ -24,3 +24,8 @@ hs_err_pid*
 replay_pid*
 
 *.DS_Store
+
+#test_files/*copy.xlsx
+test_files/**
+
+price-updater/target/**

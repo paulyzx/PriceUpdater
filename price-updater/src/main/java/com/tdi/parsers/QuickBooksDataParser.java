@@ -1,4 +1,4 @@
-package com.tdi.utils;
+package com.tdi.parsers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,13 +7,18 @@ import java.util.List;
 import com.tdi.models.ImportModel;
 import com.tdi.models.QuickBooksModel;
 
-public class QuickBooksData {
+/**
+ * Parser class for QuickBooks CSV data files.
+ */
+public class QuickBooksDataParser {
     private List<QuickBooksModel> quickBooksData;
     private List<ImportModel> table = new ArrayList<ImportModel>();
     private HashMap<String, ImportModel> qbMap = new HashMap<String, ImportModel>();
+    private HashMap<String, String> duplicatePartNumberHashMap = new HashMap<String, String>();
     private String filePath;
+    private static final String PART_TYPE = "Inventory Part";
 
-    public QuickBooksData(String filePath) {
+    public QuickBooksDataParser(String filePath) {
         this.filePath = filePath;
         this.quickBooksData = new ArrayList<QuickBooksModel>();
     }
@@ -26,13 +31,29 @@ public class QuickBooksData {
         parser.getData().stream().skip(1).forEach(this::add);
         parser.getData().stream().skip(1).forEach(this::addImportModel);
         parser.getData().stream().skip(1).forEach(this::addImportMap);
+
+        if (duplicatePartNumberHashMap.size() > 0) {
+            System.out.println("Duplicate part numbers found in QuickBooks data:");
+            int index = 1;
+            for (String value : duplicatePartNumberHashMap.values()) {
+                System.out.println(index++ + ": " + value);
+            }
+        }
     }
 
     private void addImportMap(String[] row) {
         try {
             ImportModel importModel = new ImportModel(row[3], row[4], row[2], parseDouble(row[15]),
                     parseDouble(row[12]));
-            qbMap.put(importModel.getPartNumber(), importModel);
+
+            if (importModel.getType().equals(PART_TYPE)) {
+                String searchablePartNumber = importModel.getSearchablePartNumber();
+                if (qbMap.containsKey(searchablePartNumber)) {
+                    duplicatePartNumberHashMap.put(searchablePartNumber,
+                            importModel.getPartNumber() + " " + importModel.getDescription());
+                }
+                qbMap.put(searchablePartNumber, importModel);
+            }
         } catch (NumberFormatException e) {
             System.out.println("Error parsing Import data: " + e.getMessage());
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -44,7 +65,9 @@ public class QuickBooksData {
         try {
             ImportModel importModel = new ImportModel(row[3], row[4], row[2], parseDouble(row[15]),
                     parseDouble(row[12]));
-            table.add(importModel);
+            if (importModel.getType().equals(PART_TYPE)) {
+                table.add(importModel);
+            }
         } catch (NumberFormatException e) {
             System.out.println("Error parsing Import data: " + e.getMessage());
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -57,7 +80,8 @@ public class QuickBooksData {
             QuickBooksModel quickBooksModel = new QuickBooksModel(row[1], row[2], row[3], row[4], row[5], row[6],
                     row[7], row[8], parseDouble(row[9]), row[10], parseInt(row[11]), parseDouble(row[12]),
                     row[13], row[14], parseDouble(row[15]), parseInt(row[16]), row[17], row[18]);
-            quickBooksData.add(quickBooksModel);
+            if (quickBooksModel.getType().equals(PART_TYPE))
+                quickBooksData.add(quickBooksModel);
         } catch (NumberFormatException e) {
             System.out.println("Error parsing QuickBooks data: " + e.getMessage());
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -92,24 +116,25 @@ public class QuickBooksData {
     public String getAllAsString() {
         StringBuilder sb = new StringBuilder();
         for (QuickBooksModel quickBooksModel : quickBooksData) {
-            sb.append(quickBooksModel.ActiveStatus).append(",");
-            sb.append(quickBooksModel.Type).append(",");
-            sb.append(quickBooksModel.Item).append(",");
-            sb.append(quickBooksModel.Description).append(",");
-            sb.append(quickBooksModel.SalesTaxCode).append(",");
-            sb.append(quickBooksModel.Account).append(",");
-            sb.append(quickBooksModel.COGSAccount).append(",");
-            sb.append(quickBooksModel.AssetAccount).append(",");
-            sb.append(quickBooksModel.AccumulatedDepreciation).append(",");
-            sb.append(quickBooksModel.PurchaseDescription).append(",");
-            sb.append(quickBooksModel.QuantityOnHand).append(",");
-            sb.append(quickBooksModel.Cost).append(",");
-            sb.append(quickBooksModel.PreferredVendor).append(",");
-            sb.append(quickBooksModel.TaxAgency).append(",");
-            sb.append(quickBooksModel.Price).append(",");
-            sb.append(quickBooksModel.ReorderPtMin).append(",");
-            sb.append(quickBooksModel.MPN).append(",");
-            sb.append(quickBooksModel.Location).append("\n");
+            sb.append(quickBooksModel.getActiveStatus()).append(",");
+            sb.append(quickBooksModel.getType()).append(",");
+            sb.append(quickBooksModel.getItem()).append(",");
+            sb.append(quickBooksModel.getSearchableItem()).append(",");
+            sb.append(quickBooksModel.getDescription()).append(",");
+            sb.append(quickBooksModel.getSalesTaxCode()).append(",");
+            sb.append(quickBooksModel.getAccount()).append(",");
+            sb.append(quickBooksModel.getCOGSAccount()).append(",");
+            sb.append(quickBooksModel.getAssetAccount()).append(",");
+            sb.append(quickBooksModel.getAccumulatedDepreciation()).append(",");
+            sb.append(quickBooksModel.getPurchaseDescription()).append(",");
+            sb.append(quickBooksModel.getQuantityOnHand()).append(",");
+            sb.append(quickBooksModel.getCost()).append(",");
+            sb.append(quickBooksModel.getPreferredVendor()).append(",");
+            sb.append(quickBooksModel.getTaxAgency()).append(",");
+            sb.append(quickBooksModel.getPrice()).append(",");
+            sb.append(quickBooksModel.getReorderPtMin()).append(",");
+            sb.append(quickBooksModel.getMPN()).append(",");
+            sb.append(quickBooksModel.getLocation()).append("\n");
         }
         return sb.toString();
     }

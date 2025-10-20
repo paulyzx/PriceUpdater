@@ -1,29 +1,35 @@
 package com.tdi.controllers;
 
-import javax.swing.*;
-
 import com.tdi.views.AppView;
+import com.tdi.views.DialogView;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.util.Optional;
 import java.util.Properties;
 
-import com.tdi.models.ExcelModel;
-import com.tdi.utils.CostUpdater;
-import com.tdi.utils.QuickBooksData;
+import javax.swing.SwingUtilities;
+
+import com.tdi.services.CostUpdateService;
+import com.tdi.services.PriceUpdateService;
 
 public class AppController {
     private AppView view;
-    private ExcelModel excelModel;
-    private QuickBooksData quickBooksData;
-    private CostUpdater costUpdater;
-    private Properties properties;
+    private DialogView dialogView;
+    private PriceUpdateService priceUpdateService;
+    private CostUpdateService costUpdateService;
     private String selectedVendor;
 
-    public AppController(AppView view, Properties properties) {
+    public AppController(AppView view,
+            DialogView dialogView,
+            PriceUpdateService priceUpdateService,
+            CostUpdateService costUpdaterService,
+            Properties properties) {
         this.view = view;
-        this.properties = properties;
+        this.dialogView = dialogView;
+        this.priceUpdateService = priceUpdateService;
+        this.costUpdateService = costUpdaterService;
         this.view.addButtonListener(new LoadCsvListener());
         this.view.addPerkinsListener(new GetVendorListener());
         this.view.addCreateExportCsvListener(new CreateExportCsvListener());
@@ -33,18 +39,12 @@ public class AppController {
     class LoadCsvListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-
-            JFileChooser fileChooser = new JFileChooser(
-                    new File("./test_files"));
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-
-            int returnValue = fileChooser.showOpenDialog(null);
-
-            if (returnValue == JFileChooser.APPROVE_OPTION) {
-                String filePath = fileChooser.getSelectedFile().getAbsolutePath();
-                quickBooksData = new QuickBooksData(filePath);
-                quickBooksData.create();
-                view.displayData(quickBooksData.getMapAsString());
+            view.displayData("Loading QuickBooks CSV...");
+            File file = dialogView.showLoadCsvFileChooser();
+            if (file != null) {
+                view.displayData(priceUpdateService.getQuickBooksData(file));
+            } else {
+                view.displayData("");
             }
         }
     }
@@ -52,29 +52,38 @@ public class AppController {
     class GetVendorListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            JFrame frame = new JFrame();
-            frame.setAlwaysOnTop(true);
-            Object[] options = properties.getProperty("Options").split(",");
-            selectedVendor = (String) JOptionPane.showInputDialog(frame, "Select vendor", "Vendor",
-                    JOptionPane.QUESTION_MESSAGE, null, options, null);
+            view.displayImportData("Selecting vendor...");
+
+            selectedVendor = dialogView.showInputDialog("Select vendor", "Vendor");
 
             if (selectedVendor == null) {
                 System.out.println("User cancelled");
+                view.displayImportData("");
                 return;
             }
 
-            String columnsToParse = properties.getProperty(selectedVendor);
-            System.out.println("Selected vendor: " + selectedVendor + " with columns: " + columnsToParse);
+            if (!priceUpdateService.isSelectedVendorValid(selectedVendor)) {
+                System.out.println("Invalid vendor selected: " + selectedVendor);
+                dialogView.showMessageDialog("Invalid vendor selected: " + selectedVendor, "Error");
+                return;
+            }
 
-            String vendorImportFilePath = properties.getProperty("VENDOR_IMPORT_FILE_PATH");
-            JFileChooser fileChooser = new JFileChooser(
-                    new File(System.getProperty("user.dir"), vendorImportFilePath));
-            int returnValue = fileChooser.showOpenDialog(null);
+            if (!priceUpdateService.vendorHasConfiguration(selectedVendor)) {
+                System.out.println("No configuration found for vendor: " + selectedVendor);
+                dialogView.showMessageDialog("No configuration found for vendor: " + selectedVendor, "Error");
+                return;
+            }
 
-            if (returnValue == JFileChooser.APPROVE_OPTION) {
-                String filePath = fileChooser.getSelectedFile().getAbsolutePath();
-                excelModel = new ExcelModel(filePath, columnsToParse);
-                view.displayImportData(excelModel.getAsString());
+            System.out.println("Selected vendor: " + selectedVendor + " with columns: "
+                    + priceUpdateService.getVendorColumnsAsString(selectedVendor));
+
+            File file = dialogView.showVendorFileChooser();
+            if (file != null) {
+                view.displayImportData("Processing vendor file: " + file.getName());
+                priceUpdateService.getExcelData(file, selectedVendor)
+                        .thenAccept(data -> SwingUtilities.invokeLater(() -> view.displayImportData(data)));
+            } else {
+                view.displayImportData("");
             }
         }
     }
@@ -82,29 +91,25 @@ public class AppController {
     class CreateExportCsvListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            costUpdater = new CostUpdater();
-            costUpdater.updateTable(quickBooksData.getQbMap(), excelModel.getTable());
-            view.displayExportData(costUpdater.getAsString());
+            view.displayExportData("Generating export CSV...");
+            try {
+                Optional<String> exportData = costUpdateService.createExportCsv(priceUpdateService.getQbMap(),
+                        priceUpdateService.getExcelTable(selectedVendor));
+                view.displayExportData(exportData.orElse("No export data generated."));
+            } catch (Exception ex) {
+                view.displayExportData("Error generating export CSV: " + ex.getMessage());
+                return;
+            }
         }
     }
 
     class SaveCsvListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            String fileChooserFilePath = properties.getProperty("VENDOR_IMPORT_FILE_PATH");
-            JFileChooser fileChooser = new JFileChooser(
-                    new File(fileChooserFilePath));
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-
-            int userSelection = fileChooser.showSaveDialog(null);
-
-            if (userSelection == JFileChooser.APPROVE_OPTION) {
-                File fileToSave = fileChooser.getSelectedFile();
-                System.out.println("Save as file: " + fileToSave.getAbsolutePath());
-
-                costUpdater.saveToFile(fileToSave.getAbsolutePath());
-
-                JOptionPane.showMessageDialog(null, "File saved successfully!");
+            File fileToSave = dialogView.showExportFileChooser();
+            if (fileToSave != null) {
+                costUpdateService.saveToFile(fileToSave);
+                dialogView.showMessageDialog("File saved successfully!", "Success");
             }
         }
     }
